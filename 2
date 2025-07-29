@@ -1,0 +1,73 @@
+version: “3.7”
+
+services:
+traefik:
+image: “traefik:v2.10”
+restart: always
+command:
+- “–api=true”
+- “–api.insecure=true”
+- “–providers.docker=true”
+- “–providers.docker.exposedbydefault=false”
+- “–entrypoints.web.address=:80”
+- “–entrypoints.web.http.redirections.entryPoint.to=websecure”
+- “–entrypoints.web.http.redirections.entrypoint.scheme=https”
+- “–entrypoints.websecure.address=:443”
+- “–certificatesresolvers.mytlschallenge.acme.tlschallenge=true”
+- “–certificatesresolvers.mytlschallenge.acme.email=your-email@example.com”
+- “–certificatesresolvers.mytlschallenge.acme.storage=/letsencrypt/acme.json”
+ports:
+- “80:80”
+- “443:443”
+volumes:
+- traefik_data:/letsencrypt
+- /var/run/docker.sock:/var/run/docker.sock:ro
+networks:
+- n8n_network
+
+n8n:
+image: docker.n8n.io/n8nio/n8n
+restart: always
+# Remove the malformed ports section - Traefik will handle routing
+labels:
+- traefik.enable=true
+- traefik.http.routers.n8n.rule=Host(`n8n.shay-ai.app`)
+- traefik.http.routers.n8n.tls=true
+- traefik.http.routers.n8n.entrypoints=websecure
+- traefik.http.routers.n8n.tls.certresolver=mytlschallenge
+- traefik.http.services.n8n.loadbalancer.server.port=5678
+# Security headers middleware
+- traefik.http.middlewares.n8n-headers.headers.SSLRedirect=true
+- traefik.http.middlewares.n8n-headers.headers.STSSeconds=315360000
+- traefik.http.middlewares.n8n-headers.headers.browserXSSFilter=true
+- traefik.http.middlewares.n8n-headers.headers.contentTypeNosniff=true
+- traefik.http.middlewares.n8n-headers.headers.forceSTSHeader=true
+- traefik.http.middlewares.n8n-headers.headers.STSIncludeSubdomains=true
+- traefik.http.middlewares.n8n-headers.headers.STSPreload=true
+- traefik.http.routers.n8n.middlewares=n8n-headers@docker
+environment:
+- N8N_HOST=n8n.shay-ai.app
+- N8N_PORT=5678
+- N8N_PROTOCOL=https
+- NODE_ENV=production
+- WEBHOOK_URL=https://n8n.shay-ai.app/
+- GENERIC_TIMEZONE=America/New_York
+# Optional: Add basic auth for extra security
+# - N8N_BASIC_AUTH_ACTIVE=true
+# - N8N_BASIC_AUTH_USER=admin
+# - N8N_BASIC_AUTH_PASSWORD=your_secure_password_here
+volumes:
+- n8n_data:/home/node/.n8n
+- /local-files:/files
+networks:
+- n8n_network
+depends_on:
+- traefik
+
+networks:
+n8n_network:
+driver: bridge
+
+volumes:
+traefik_data:
+n8n_data:

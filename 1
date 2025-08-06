@@ -58,3 +58,31 @@ if (-not (Test-Path $regPath)) {
 }
 
 Set-ItemProperty -Path $regPath -Name $appPath -Value "RUNASADMIN"
+
+
+
+$taskName = "PassportElevatedLaunch"
+
+$taskExists = schtasks.exe /Query /TN $taskName 2>$null
+if ($LASTEXITCODE -eq 0) {
+    exit 0  # Task already exists
+} else {
+    exit 1  # Task needs to be created
+}
+
+
+
+
+
+$taskName = "PassportElevatedLaunch"
+$appPath = "C:\Program Files (x86)\PASSPORT\Passport.exe"
+
+# Delete existing task if it exists (to update any changes)
+schtasks.exe /Delete /F /TN $taskName 2>$null | Out-Null
+
+# Create the new scheduled task to run as SYSTEM with highest privileges
+$action = New-ScheduledTaskAction -Execute $appPath
+$trigger = New-ScheduledTaskTrigger -AtLogOn
+$principal = New-ScheduledTaskPrincipal -UserId "SYSTEM" -RunLevel Highest
+
+Register-ScheduledTask -TaskName $taskName -Action $action -Trigger $trigger -Principal $principal -Description "Run Passport.exe without UAC prompt" -Force

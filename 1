@@ -1,29 +1,60 @@
-reg load HKU\DefaultUser "C:\Users\Default\NTUSER.DAT"
+# Evaluation Code
+$appPath = "C:\Program Files (x86)\PASSPORT\Passport.exe"
+$regPath = "HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\AppCompatFlags\Layers"
 
-reg add "HKU\DefaultUser\Control Panel\Desktop" /v Wallpaper /t REG_SZ /d "C:\Windows\Web\Wallpaper\Custom\wallpaper.jpg" /f
-reg add "HKU\DefaultUser\Control Panel\Desktop" /v WallpaperStyle /t REG_SZ /d "2" /f
-reg add "HKU\DefaultUser\Control Panel\Desktop" /v TileWallpaper /t REG_SZ /d "0" /f
-
-reg unload HKU\DefaultUser
-
-📌 WallpaperStyle values:
-
-0 = Center
-
-2 = Stretch
-
-6 = Fit
-
-10 = Fill
+try {
+    $value = Get-ItemProperty -Path $regPath -Name $appPath -ErrorAction Stop
+    if ($value.$appPath -eq "RUNASADMIN") {
+        exit 0  # Already set
+    } else {
+        exit 1  # Needs fix
+    }
+} catch {
+    exit 1  # Key doesn't exist or value not set
+}
 
 
-taskbar
-
-reg load HKU\DefaultUser "C:\Users\Default\NTUSER.DAT"
-reg add "HKU\DefaultUser\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced" /v TaskbarAl /t REG_DWORD /d 0 /f
-reg unload HKU\DefaultUser
-
-reg add "HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced" /v TaskbarAl /t REG_DWORD /d 0 /f
 
 
-Stop-Process -Name explorer -Force
+# Remediation Code
+$appPath = "C:\Program Files (x86)\PASSPORT\Passport.exe"
+$regPath = "HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\AppCompatFlags\Layers"
+
+# Create key if missing
+if (-not (Test-Path $regPath)) {
+    New-Item -Path $regPath -Force | Out-Null
+}
+
+# Set the admin flag
+Set-ItemProperty -Path $regPath -Name $appPath -Value "RUNASADMIN"
+
+
+# Evaluation Code
+$appPath = "C:\Program Files (x86)\PASSPORT\Passport.exe"
+$regPath = "HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\AppCompatFlags\Layers"
+
+$isWin11 = ([System.Environment]::OSVersion.Version.Build -ge 22000)
+
+try {
+    $value = Get-ItemProperty -Path $regPath -Name $appPath -ErrorAction Stop
+    $isSet = ($value.$appPath -eq "RUNASADMIN")
+} catch {
+    $isSet = $false
+}
+
+if ($isWin11 -and -not $isSet) {
+    exit 1  # Needs fix
+} else {
+    exit 0  # No action needed
+}
+
+
+# Remediation Code
+$appPath = "C:\Program Files (x86)\PASSPORT\Passport.exe"
+$regPath = "HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\AppCompatFlags\Layers"
+
+if (-not (Test-Path $regPath)) {
+    New-Item -Path $regPath -Force | Out-Null
+}
+
+Set-ItemProperty -Path $regPath -Name $appPath -Value "RUNASADMIN"
